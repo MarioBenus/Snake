@@ -5,43 +5,55 @@
 #include <stdlib.h>
 
 #include "pipe.h"
+#include "sll.h"
+#include "snake.h"
+
 
 
 void server(size_t game_width, size_t game_height, char* server_name)
 {
-    char asd[game_width + 2][game_height + 3];
+    char board[game_width + 2][game_height + 3];
     for (size_t i = 0; i < game_height + 2; i++)
         for (size_t j = 0; j < game_width + 2; j++)
-            asd[i][j] = j + 48;
+            board[i][j] = ' ';
     
     for (size_t i = 0; i < game_width + 2; i++)
     {
-        asd[i][game_height + 2] = '\0';
+        board[i][game_height + 2] = '\0';
     }
     
 
     // borders
     for (size_t i = 1; i < game_width + 1; i++)
-        asd[i][0] = '-';
+        board[i][0] = '-';
     for (size_t i = 1; i < game_width + 1; i++)
-        asd[i][game_height + 1] = '-';
+        board[i][game_height + 1] = '-';
     for (size_t i = 1; i < game_height + 1; i++)
-        asd[0][i] = '|';
+        board[0][i] = '|';
     for (size_t i = 1; i < game_height + 1; i++)
-        asd[game_width + 1][i] = '|';
-    asd[0][0] = '/';
-    asd[game_width + 1][game_height + 1] = '/';
-    asd[0][game_height + 1] = '\\';
-    asd[game_width + 1][0] = '\\';
+        board[game_width + 1][i] = '|';
+    board[0][0] = '/';
+    board[game_width + 1][game_height + 1] = '/';
+    board[0][game_height + 1] = '\\';
+    board[game_width + 1][0] = '\\';
 
     const int fd_pipe = pipe_open_write(server_name);
+    sll snake;
+    snake_init(&snake);
+    sll_for_each(&snake, snake_draw_node_on_board, board, NULL, NULL);
 
-    for (size_t i = 0; i < game_width + 2; i++)
-    {
-        write(fd_pipe, asd[i], game_height + 3);
-    }
+
+    // while (1) // GAME LOOP
+    // {
+        for (size_t i = 0; i < game_width + 2; i++)
+        {
+            write(fd_pipe, board[i], game_height + 3);
+        }
+    // }
+    
+
+    
     pipe_close(fd_pipe);
-
     return;
 }
 
@@ -58,20 +70,20 @@ void* client_render(size_t game_width, size_t game_height, char* server_name)
     curs_set(FALSE);          // Hide the cursor
 
 
-    char asd[game_width + 2][game_height + 3];
+    char board[game_width + 2][game_height + 3];
 
     const int fd_pipe = pipe_open_read(server_name);
 
     for (size_t i = 0; i < game_width + 2; i++)
     {
-        read(fd_pipe, asd[i], game_height + 3);
+        read(fd_pipe, board[i], game_height + 3);
     }
 
     for (size_t i = 0; i < game_width + 2; i++)
     {
         for (size_t j = 0; j < game_height + 2; j++)
         {
-            printw("%c", asd[j][i]);
+            printw("%c", board[j][i]);
         }
         printw("\n");
     }
@@ -93,14 +105,14 @@ int main() {
         printf("3) Exit\n\n");
 
         char a;
-        scanf("%s", &a);
-        if (a == '1') // CREATE GAME
+        //scanf("%s", &a); // disabled for testing
+        if (a == '1' || 1 /* for testing*/) // CREATE GAME
         {
             while (1)
             {
-                printf("\nWrite a name for the server\n");
-                char* b = calloc(11, sizeof(char));
-                scanf("%s", b);
+                //printf("\nWrite a name for the server\n"); // Disabled for testing
+                char b[11] = "SERVER";
+                //scanf("%s", b);
 
                 pipe_init(b);
 
@@ -111,7 +123,6 @@ int main() {
                 {
                     client_render(20, 20, b);
                     pipe_destroy(b);
-                    free(b);
                 }
                 return 0;
             }
