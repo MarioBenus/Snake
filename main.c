@@ -6,13 +6,29 @@
 #include <sys/time.h>
 #include <pthread.h>
 
+
 #include "pipe.h"
 #include "sll.h"
 #include "snake.h"
 
 #define SLEEP_LENGTH 150000
 
+coordinates server_place_apple(char* board, size_t game_width, size_t game_height)
+{
+    coordinates apple_pos;
+    while (1)
+    {
+        int x = rand() % game_width + 1;
+        int y = rand() % game_height + 1;
 
+        if (board[x * game_height + y] == ' ')
+        {
+            apple_pos.pos_x = x;
+            apple_pos.pos_y = y;
+            return apple_pos;
+        }
+    }
+}
 
 void server(size_t game_width, size_t game_height, char* server_name)
 {
@@ -43,6 +59,8 @@ void server(size_t game_width, size_t game_height, char* server_name)
     sll snake;
     snake_init(&snake);
 
+    //coordinates apple_pos = server_place_apple(board, game_width, game_height);
+
     char last_input = '\0';
     while (1) // GAME LOOP
     {
@@ -53,7 +71,9 @@ void server(size_t game_width, size_t game_height, char* server_name)
 
         for (size_t i = 1; i < game_height + 1; i++)
             for (size_t j = 1; j < game_width + 1; j++)
-                board[i][j] = ' ';
+                board[j][i] = ' ';
+        
+        //board[apple_pos.pos_x][apple_pos.pos_y] = '@';
 
         snake_node sn;
         sll_get(&snake, 0, &sn);
@@ -80,7 +100,7 @@ void server(size_t game_width, size_t game_height, char* server_name)
 
         for (size_t i = 0; i < game_width + 2; i++)
         {
-            write(fd_pipe_board, board[i], game_height + 3);
+            write(fd_pipe_board, board[i], sizeof(char) * (game_height + 3));
         }
 
         usleep(SLEEP_LENGTH);
@@ -147,16 +167,23 @@ void* client_render(void* args)
 
         for (size_t i = 0; i < game_width + 2; i++)
         {
-            read(fd_pipe, board[i], game_height + 3);
+            read(fd_pipe, board[i], sizeof(char) * (game_height + 3));
         }
 
         clear();
 
-        for (size_t i = 0; i < game_width + 2; i++)
+        // for (size_t i = 0; i < game_width + 2; i++)
+        // {
+        //     printw("%s", board[i]);
+        //     printw("\n");
+        // }
+        
+
+        for (size_t j = 0; j < game_height + 2; j++)
         {
-            for (size_t j = 0; j < game_height + 2; j++)
+            for (size_t i = 0; i < game_width + 2; i++)
             {
-                printw("%c", board[j][i]);
+                printw("%c", board[i][j]);
             }
             printw("\n");
         }
@@ -172,6 +199,7 @@ void* client_render(void* args)
 }
 
 int main() {
+    srand(time(NULL));
     while (1)
     {
         printf("1) Create a new game\n");
@@ -193,13 +221,13 @@ int main() {
 
                 const pid_t pid = fork();
                 if (pid == 0)
-                    server(20, 20, b);
+                    server(30, 20, b);
                 else
                 {
                     pthread_t render_thread;
                     pthread_t input_thread;
                     bool quit = false;
-                    client_render_thread_data crtd = {20, 20, b, &quit};
+                    client_render_thread_data crtd = {30, 20, b, &quit};
                     pthread_create(&render_thread, NULL, client_render, &crtd);
                     pthread_create(&input_thread, NULL, client_input, &quit);
 
