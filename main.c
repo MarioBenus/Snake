@@ -3,19 +3,20 @@
 #include <curses.h>
 #include <pthread.h>
 #include <stdlib.h>
+#include <sys/time.h>
+#include <pthread.h>
 
 #include "pipe.h"
 #include "sll.h"
 #include "snake.h"
+
+#define SLEEP_LENGTH 150000
 
 
 
 void server(size_t game_width, size_t game_height, char* server_name)
 {
     char board[game_width + 2][game_height + 3];
-    for (size_t i = 0; i < game_height + 2; i++)
-        for (size_t j = 0; j < game_width + 2; j++)
-            board[i][j] = ' ';
     
     for (size_t i = 0; i < game_width + 2; i++)
     {
@@ -37,61 +38,134 @@ void server(size_t game_width, size_t game_height, char* server_name)
     board[0][game_height + 1] = '\\';
     board[game_width + 1][0] = '\\';
 
-    const int fd_pipe = pipe_open_write(server_name);
+    const int fd_pipe_board = pipe_open_write(server_name);
+    const int fd_pipe_input = pipe_open_read("SERVER-INPUT");
     sll snake;
     snake_init(&snake);
-    sll_for_each(&snake, snake_draw_node_on_board, board, NULL, NULL);
 
+    char last_input = '\0';
+    while (1) // GAME LOOP
+    {
+        char new_input;
+        read(fd_pipe_input, &new_input, 1);
+        if (new_input == 'q' || new_input == 'w' || new_input == 'a' || new_input == 's' || new_input == 'd')
+            last_input = new_input;
 
-    // while (1) // GAME LOOP
-    // {
+        for (size_t i = 1; i < game_height + 1; i++)
+            for (size_t j = 1; j < game_width + 1; j++)
+                board[i][j] = ' ';
+
+        snake_node sn;
+        sll_get(&snake, 0, &sn);
+        coordinates snake_pos = sn.position;
+        
+        if (last_input == 'q')
+            break;
+        if (last_input == 'w')
+            snake_pos.pos_y -= 1;
+        if (last_input == 'a')
+            snake_pos.pos_x -= 1;
+        if (last_input == 's')
+            snake_pos.pos_y += 1;
+        if (last_input == 'd')
+            snake_pos.pos_x += 1;
+
+        if (board[snake_pos.pos_x][snake_pos.pos_y] != ' ') // COLLISION
+        {
+            // TODO
+        }
+
+        sll_for_each(&snake, snake_move, &snake_pos, NULL, NULL);
+        sll_for_each(&snake, snake_draw_node_on_board, board, NULL, NULL);
+
         for (size_t i = 0; i < game_width + 2; i++)
         {
-            write(fd_pipe, board[i], game_height + 3);
+            write(fd_pipe_board, board[i], game_height + 3);
         }
-    // }
+
+        usleep(SLEEP_LENGTH);
+    }
     
 
-    
-    pipe_close(fd_pipe);
+    pipe_close(fd_pipe_input);
+    pipe_close(fd_pipe_board);
     return;
 }
 
-void* client_input()
+
+void* client_input(void* args)
 {
-    return NULL;
+    bool* quit = args;
+    const int fd_pipe = pipe_open_write("SERVER-INPUT");
+    while (1)
+    {
+        char ch = getch();
+        flushinp();
+
+        write(fd_pipe, &ch, 1);
+
+        if (ch == 'q')
+        {
+            *quit = true;
+            break;
+        }
+        usleep(SLEEP_LENGTH);
+    }
+
+    pipe_close(fd_pipe);
 }
 
-void* client_render(size_t game_width, size_t game_height, char* server_name)
+typedef struct client_render_thread_data
+{
+    size_t game_width; 
+    size_t game_height; 
+    char* server_name;
+    bool* quit;
+} client_render_thread_data;
+
+void* client_render(void* args)
 {
     initscr();                // Initialize ncurses
     nodelay(stdscr, TRUE);    // Set non-blocking input mode
     noecho();                 // Disable echoing of typed characters
     curs_set(FALSE);          // Hide the cursor
 
+    client_render_thread_data* td = args;
+    size_t game_width = td->game_width;
+    size_t game_height = td->game_height;
+    char* server_name = td->server_name;
+    bool* quit = td->quit;
 
     char board[game_width + 2][game_height + 3];
 
     const int fd_pipe = pipe_open_read(server_name);
 
-    for (size_t i = 0; i < game_width + 2; i++)
+    while (1)
     {
-        read(fd_pipe, board[i], game_height + 3);
-    }
+        if (*quit)
+            break;
 
-    for (size_t i = 0; i < game_width + 2; i++)
-    {
-        for (size_t j = 0; j < game_height + 2; j++)
+        for (size_t i = 0; i < game_width + 2; i++)
         {
-            printw("%c", board[j][i]);
+            read(fd_pipe, board[i], game_height + 3);
         }
-        printw("\n");
+
+        clear();
+
+        for (size_t i = 0; i < game_width + 2; i++)
+        {
+            for (size_t j = 0; j < game_height + 2; j++)
+            {
+                printw("%c", board[j][i]);
+            }
+            printw("\n");
+        }
+
+        refresh();
+        usleep(SLEEP_LENGTH);
     }
-    refresh();
-    sleep(5);
     
     pipe_close(fd_pipe);
-    curs_set(TRUE);
     endwin();
     return NULL;
 
@@ -115,14 +189,24 @@ int main() {
                 //scanf("%s", b);
 
                 pipe_init(b);
+                pipe_init("SERVER-INPUT"); // TODO: CHANGE
 
                 const pid_t pid = fork();
                 if (pid == 0)
                     server(20, 20, b);
                 else
                 {
-                    client_render(20, 20, b);
+                    pthread_t render_thread;
+                    pthread_t input_thread;
+                    bool quit = false;
+                    client_render_thread_data crtd = {20, 20, b, &quit};
+                    pthread_create(&render_thread, NULL, client_render, &crtd);
+                    pthread_create(&input_thread, NULL, client_input, &quit);
+
+                    pthread_join(render_thread, NULL);
+                    pthread_join(input_thread, NULL);
                     pipe_destroy(b);
+                    pipe_destroy("SERVER-INPUT");
                 }
                 return 0;
             }
