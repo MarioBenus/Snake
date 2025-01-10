@@ -5,13 +5,24 @@
 #include <stdlib.h>
 #include <sys/time.h>
 #include <pthread.h>
-
+#include <string.h>
 
 #include "pipe.h"
 #include "sll.h"
 #include "snake.h"
 
 #define SLEEP_LENGTH 150000
+
+char* add_suffix(const char* str, const char* suffix)
+{
+    const int str_len = strlen(str);
+    const int new_len = str_len + strlen(suffix) + 2;
+    char* result = calloc(new_len, sizeof(char));
+    strcpy(result, str);
+    result[str_len] = '-';
+    strcpy(result + str_len + 1, suffix);
+    return result;
+}
 
 coordinates server_place_apple(size_t game_width, size_t game_height, char (*board)[game_height + 3])
 {
@@ -55,8 +66,10 @@ void server(size_t game_width, size_t game_height, char* server_name)
     board[0][game_height + 1] = '\\';
     board[game_width + 1][0] = '\\';
 
-    const int fd_pipe_board = pipe_open_write(server_name);
-    const int fd_pipe_input = pipe_open_read("SERVER-INPUT");
+    char* pipe_render = add_suffix(server_name, "RENDER");
+    char* pipe_input = add_suffix(server_name, "INPUT");
+    const int fd_pipe_board = pipe_open_write(pipe_render);
+    const int fd_pipe_input = pipe_open_read(pipe_input);
     sll snake;
     snake_init(&snake);
 
@@ -136,17 +149,27 @@ void server(size_t game_width, size_t game_height, char* server_name)
         usleep(SLEEP_LENGTH);
     }
     
+
+    free (pipe_input);
+    free (pipe_render);
     sll_clear(&snake);
     pipe_close(fd_pipe_input);
     pipe_close(fd_pipe_board);
     return;
 }
 
+typedef struct client_input_thread_data
+{
+    bool* quit;
+    char* server_name;
+} client_input_thread_data;
 
 void* client_input(void* args)
 {
-    bool* quit = args;
-    const int fd_pipe = pipe_open_write("SERVER-INPUT");
+    client_input_thread_data* citd = args;
+    bool* quit = citd->quit;
+    char* pipe_name = add_suffix(citd->server_name, "INPUT");
+    const int fd_pipe = pipe_open_write(pipe_name);
     while (1)
     {
         char ch = getch();
@@ -162,6 +185,7 @@ void* client_input(void* args)
         usleep(SLEEP_LENGTH);
     }
 
+    free(pipe_name);
     pipe_close(fd_pipe);
 }
 
@@ -188,7 +212,8 @@ void* client_render(void* args)
 
     char board[game_width + 2][game_height + 3];
 
-    const int fd_pipe = pipe_open_read(server_name);
+    char* pipe_name = add_suffix(server_name, "RENDER");
+    const int fd_pipe = pipe_open_read(pipe_name);
 
     while (1)
     {
@@ -222,6 +247,7 @@ void* client_render(void* args)
         usleep(SLEEP_LENGTH);
     }
     
+    free(pipe_name);
     pipe_close(fd_pipe);
     endwin();
     return NULL;
@@ -244,9 +270,10 @@ int main() {
                 //printf("\nWrite a name for the server\n"); // Disabled for testing
                 char b[11] = "SERVER";
                 //scanf("%s", b);
-
-                pipe_init(b);
-                pipe_init("SERVER-INPUT"); // TODO: CHANGE
+                char* pipe_name_render = add_suffix(b, "RENDER");
+                char* pipe_name_input = add_suffix(b, "INPUT");
+                pipe_init(pipe_name_render);
+                pipe_init(pipe_name_input);
 
                 const pid_t pid = fork();
                 if (pid == 0)
@@ -258,12 +285,16 @@ int main() {
                     bool quit = false;
                     client_render_thread_data crtd = {30, 20, b, &quit};
                     pthread_create(&render_thread, NULL, client_render, &crtd);
-                    pthread_create(&input_thread, NULL, client_input, &quit);
+                    client_input_thread_data citd = {&quit, b};
+                    pthread_create(&input_thread, NULL, client_input, &citd);
 
                     pthread_join(render_thread, NULL);
                     pthread_join(input_thread, NULL);
-                    pipe_destroy(b);
-                    pipe_destroy("SERVER-INPUT");
+
+                    pipe_destroy(pipe_name_render);
+                    pipe_destroy(pipe_name_input);
+                    free(pipe_name_input);
+                    free(pipe_name_render);
                 }
                 return 0;
             }
