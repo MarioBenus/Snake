@@ -1,17 +1,17 @@
 #include "snake.h"
+#include <stdlib.h>
 
 void snake_init(sll* single_linked_list)
 {
     sll_init(single_linked_list, sizeof(snake_node));
-    coordinates pos1 = {1, 1};
-    coordinates pos2 = {1, 1};
-    coordinates pos3 = {1, 1};
-    snake_node sn1 = {pos1, 'O'};
-    snake_node sn2 = {pos2, 'O'};
-    snake_node sn3 = {pos3, 'O'};
-    sll_add(single_linked_list, &sn3);
-    sll_add(single_linked_list, &sn2);
-    sll_add(single_linked_list, &sn1);
+    for (size_t i = 0; i < 3; i++)
+    {
+        snake_node* sn = malloc(sizeof(snake_node));
+        sn->position.pos_x = 1;
+        sn->position.pos_y = 1;
+        sn->symbol = '*';
+        sll_add(single_linked_list, sn);
+    }
 }
 
 void snake_move(void* data, void* in, void* out, void* err)
@@ -28,4 +28,16 @@ void snake_draw_node_on_board(void* data, void* in, void* out, void* err)
     snake_node* sn = data;
     char (*board)[32][23] = (char (*)[32][23])in; // TODO: make dynmic
     board[0][sn->position.pos_x][sn->position.pos_y] = sn->symbol;
+}
+
+void snake_death(void* data, void* in, void* out, void* err)
+{
+    snake_node* sn = data;
+    sn->symbol = 'X';
+}
+
+void snake_start(void* data, void* in, void* out, void* err)
+{
+    snake_node* sn = data;
+    sn->symbol = 'O';
 }
