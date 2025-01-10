@@ -1,7 +1,7 @@
 CC = gcc
 LDFLAGS = -lncurses
 
-SRCS = main.c pipe.c sll.c snake.c
+SRCS = main.c pipe.c sll.c snake.c server.c client.c common.c
 OBJS = $(SRCS:.c=.o)
 
 TARGET = snake
