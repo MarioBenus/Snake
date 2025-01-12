@@ -41,3 +41,10 @@ void snake_start(void* data, void* in, void* out, void* err)
     snake_node* sn = data;
     sn->symbol = 'O';
 }
+
+void snake_undraw_node_from_board(void* data, void* in, void* out, void* err)
+{
+    snake_node* sn = data;
+    char (*board)[32][23] = (char (*)[32][23])in; // TODO: make dynmic
+    board[0][sn->position.pos_x][sn->position.pos_y] = ' ';
+}
