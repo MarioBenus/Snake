@@ -28,7 +28,7 @@ int main() {
                 //scanf("%s", b);
 
                 const pid_t pid = fork();
-                if (pid == 0)
+                if (pid != 0)
                     server(30, 20, b);
                 else
                 {

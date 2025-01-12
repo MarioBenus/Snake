@@ -12,6 +12,23 @@
 
 #define SLEEP_LENGTH 150000
 
+void server_place_apple(size_t game_width, size_t game_height, char (*board)[game_height + 3])
+{
+    srand(time(NULL));
+    while (1)
+    {
+        int x = rand() % game_width + 1;
+        int y = rand() % game_height + 1;
+
+        if (board[x][y] == ' ')
+        {
+            printf("trying to place apple at %d %d\n", x, y);
+            board[x][y] = '@';
+            return;
+        }
+    }
+}
+
 typedef struct user_data
 {
     sll snake;
@@ -21,6 +38,7 @@ typedef struct user_data
     int fd_pipe_render; 
     char last_input;
     bool quit;
+    coordinates apple_coordinates;
 } user_data;
 
 void free_user_data_sll(void* data, void* in, void* out, void* err)
@@ -100,29 +118,14 @@ void* server_assign_id(void* args)
 }
 
 
-coordinates server_place_apple(size_t game_width, size_t game_height, char (*board)[game_height + 3])
-{
-    srand(time(NULL));
-    coordinates apple_pos;
-    while (1)
-    {
-        int x = rand() % game_width + 1;
-        int y = rand() % game_height + 1;
 
-        if (board[x][y] == ' ')
-        {
-            apple_pos.pos_x = x;
-            apple_pos.pos_y = y;
-            return apple_pos;
-        }
-    }
-}
 
 typedef struct server_game_loop_data
 {
     size_t game_width; 
     size_t game_height; 
     char* board;
+    size_t* apple_count;
 } server_game_loop_data;
 
 
@@ -175,8 +178,12 @@ void server_game_loop(void* data, void* in, void* out, void* err)
     {
         snake_node sn2;
         sn2.symbol = 'O';
+        coordinates coor;
+        coor.pos_x = 0;
+        coor.pos_y = 0;
+        sn2.position = coor;
         sll_add(&ud->snake, &sn2);
-        // apple_pos = server_place_apple(game_width, game_height, board);
+        *sgld->apple_count -= 1;
 
     }
     else if (board[0][snake_pos.pos_x][snake_pos.pos_y] == '-' ||
@@ -186,7 +193,6 @@ void server_game_loop(void* data, void* in, void* out, void* err)
         sll_for_each(&ud->snake, snake_death, NULL, NULL, NULL);
     }
     
-    // board[apple_pos.pos_x][apple_pos.pos_y] = '@';
 
     sll_for_each(&ud->snake, snake_undraw_node_from_board, board, NULL, NULL);
 
@@ -251,7 +257,7 @@ void server(size_t game_width, size_t game_height, char* server_name)
         
     
 
-
+    size_t apple_count = 0;
 
     server_assign_id_thread_data saitd;
     saitd.server_name = server_name;
@@ -266,17 +272,25 @@ void server(size_t game_width, size_t game_height, char* server_name)
     pthread_t server_assign_id_thread;
     pthread_create(&server_assign_id_thread, NULL, server_assign_id, &saitd);
 
-    // coordinates apple_pos = server_place_apple(game_width, game_height, board);
 
     server_game_loop_data sgld;
     sgld.board = board;
     sgld.game_height = game_height;
     sgld.game_width = game_width;
+    sgld.apple_count = &apple_count;
 
     int no_players_counter = 0;
 
     while (1) // GAME LOOP
     {
+        size_t user_count = syn_sll_get_size(&ssll);
+
+        while (apple_count < user_count)
+        {
+            server_place_apple(game_width, game_height, board);
+            apple_count++;
+        }
+
         syn_sll_for_each(&ssll, server_game_loop, &sgld, NULL, NULL);
 
         int zero = 0;
