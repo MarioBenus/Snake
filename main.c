@@ -18,17 +18,17 @@ int main() {
         printf("3) Exit\n\n");
 
         char a;
-        scanf("%s", &a); // disabled for testing
-        if (a == '1' /*|| 1  for testing*/) // CREATE GAME
+        scanf("%s", &a); 
+        if (a == '1') // CREATE GAME
         {
             while (1)
             {
-                //printf("\nWrite a name for the server\n"); // Disabled for testing
-                char b[11] = "SERVER";
-                //scanf("%s", b);
+                printf("\nWrite a name for the server\n");
+                char b[20];
+                scanf("%s", b);
 
                 const pid_t pid = fork();
-                if (pid != 0)
+                if (pid == 0)
                     server(30, 20, b);
                 else
                 {
@@ -40,7 +40,9 @@ int main() {
         }
         else if (a == '2') // JOIN GAME
         {
-            char b[11] = "SERVER";
+            printf("\nWrite a name for the server\n");
+            char b[20];
+            scanf("%s", b);
             client_join(b);
             break;
         }

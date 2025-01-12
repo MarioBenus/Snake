@@ -14,7 +14,6 @@
 
 void server_place_apple(size_t game_width, size_t game_height, char (*board)[game_height + 3])
 {
-    srand(time(NULL));
     while (1)
     {
         int x = rand() % game_width + 1;
@@ -22,7 +21,6 @@ void server_place_apple(size_t game_width, size_t game_height, char (*board)[gam
 
         if (board[x][y] == ' ')
         {
-            printf("trying to place apple at %d %d\n", x, y);
             board[x][y] = '@';
             return;
         }
@@ -230,6 +228,7 @@ void server_test_quit_user(void* data, void* in, void* out, void* err)
 
 void server(size_t game_width, size_t game_height, char* server_name)
 {
+    srand(time(NULL));
     char board[game_width + 2][game_height + 3];
     
     for (size_t i = 0; i < game_width + 2; i++)
