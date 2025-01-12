@@ -21,5 +21,6 @@ void snake_move(void* data, void* in, void* out, void* err);
 void snake_draw_node_on_board(void* data, void* in, void* out, void* err);
 void snake_death(void* data, void* in, void* out, void* err);
 void snake_start(void* data, void* in, void* out, void* err);
+void snake_undraw_node_from_board(void* data, void* in, void* out, void* err);
 
 #endif
