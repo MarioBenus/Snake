@@ -135,8 +135,10 @@ void client_join(char* server_name)
     pthread_join(render_thread, NULL);
     pthread_join(input_thread, NULL);
 
-    pipe_destroy(pipe_name_render);
-    pipe_destroy(pipe_name_input);
+    
+
+    // pipe_destroy(pipe_name_render);
+    // pipe_destroy(pipe_name_input);
     free(pipe_name_input);
     free(pipe_name_render);
 }

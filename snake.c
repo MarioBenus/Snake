@@ -6,11 +6,11 @@ void snake_init(sll* single_linked_list)
     sll_init(single_linked_list, sizeof(snake_node));
     for (size_t i = 0; i < 3; i++)
     {
-        snake_node* sn = malloc(sizeof(snake_node));
-        sn->position.pos_x = 1;
-        sn->position.pos_y = 1;
-        sn->symbol = '*';
-        sll_add(single_linked_list, sn);
+        snake_node sn;
+        sn.position.pos_x = 1;
+        sn.position.pos_y = 1;
+        sn.symbol = '*';
+        sll_add(single_linked_list, &sn);
     }
 }
 

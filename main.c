@@ -28,7 +28,7 @@ int main() {
                 //scanf("%s", b);
 
                 const pid_t pid = fork();
-                if (pid != 0)
+                if (pid == 0)
                     server(30, 20, b);
                 else
                 {
@@ -42,6 +42,7 @@ int main() {
         {
             char b[11] = "SERVER";
             client_join(b);
+            break;
         }
         else if (a == '3') // EXIT
             break;
